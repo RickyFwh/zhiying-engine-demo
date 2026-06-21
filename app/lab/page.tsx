@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { getClientConfig } from '@/lib/client-config';
 
 interface LabResult {
   content: string;
@@ -41,7 +42,7 @@ export default function LabPage() {
     try {
       const res = await fetch('/api/lab', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, systemPrompt, temperature, maxTokens }),
+        body: JSON.stringify({ prompt, systemPrompt, temperature, maxTokens, clientConfig: getClientConfig() }),
       });
       const data = await res.json();
       if (data.success) {

@@ -1,39 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runDecisionEngine } from '@/lib/decision-engine';
 import { chatCompletion } from '@/lib/llm';
+import { runDecisionEngine } from '@/lib/decision-engine';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { goal, budget, targetROI, productId } = body;
+    const { goal, budget, targetROI, productId, clientConfig } = body;
 
-    // 1. 运行规则引擎
-    const ruleResults = runDecisionEngine({ goal, budget, targetROI, productId });
+    // Rule engine first
+    const ruleResult = runDecisionEngine({
+      goal: goal || 'acquisition',
+      budget: budget || 500,
+      targetROI: targetROI || 2.0,
+      productId: productId || undefined,
+    });
 
-    // 2. 用 LLM 增强决策分析
-    const llmAnalysis = await chatCompletion([
-      {
-        role: 'system',
-        content: `你是"智营引擎"AI市场运营Agent的决策大脑模块。你是一位资深投放师，精通抖音千川和小红书聚光平台的投放策略。
-请基于以下规则引擎的输出，给出更详细的分析和补充建议。用中文回答，格式清晰，包含具体数字。`
-      },
-      {
-        role: 'user',
-        content: `投放目标：${goal === 'acquisition' ? '拉新' : goal === 'repurchase' ? '复购' : '品牌曝光'}
-日预算：¥${budget}
-目标ROI：${targetROI}
-${productId ? `指定产品：${productId}` : '全部3款产品'}
+    // Then LLM analysis
+    const systemPrompt = `你是一位资深的数据驱动营销决策专家。基于以下规则引擎的分析结果，给出你的决策建议。
+要求：
+1. 解读每条规则的含义和优先级
+2. 分析可能的风险和机会
+3. 给出具体的行动建议（包括时间线）
+4. 预判注意事项
+5. 给出整体置信度评估
+用中文回答，简洁有力。`;
 
-规则引擎输出：
-${ruleResults.map((r, i) => `${i + 1}. [${r.priority}] ${r.description}`).join('\n')}
+    const userPrompt = `投放目标：${goal === 'acquisition' ? '拉新获客' : goal === 'repurchase' ? '促进复购' : '品牌曝光'}
+日预算：¥${budget || 500}
+目标ROI：${targetROI || 2.0}
 
-请补充你的分析和额外建议。`
-      }
-    ], { temperature: 0.7 });
+规则引擎分析结果：
+${JSON.stringify(ruleResult, null, 2)}
+
+请基于以上信息给出你的决策建议。`;
+
+    const llmContent = await chatCompletion([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], { temperature: 0.6, maxTokens: 2000, clientConfig });
 
     return NextResponse.json({
-      rules: ruleResults,
-      llmAnalysis,
+      rules: ruleResult,
+      llmAnalysis: llmContent,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { getClientConfig } from '@/lib/client-config';
 
 export default function ContentPage() {
   const [productId, setProductId] = useState('p1');
@@ -22,7 +23,7 @@ export default function ContentPage() {
     try {
       const res = await fetch('/api/content', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, platform, contentType, extraInstructions }),
+        body: JSON.stringify({ productId, platform, contentType, extraInstructions, clientConfig: getClientConfig() }),
       });
       const data = await res.json();
       setResult(data.content || data.error);

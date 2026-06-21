@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef } from 'react';
+import { getClientConfig } from '@/lib/client-config';
 
 interface StepResult {
   content: string;
@@ -57,6 +58,7 @@ export default function PipelinePage() {
         platform,
         contentType,
         competitors,
+        clientConfig: getClientConfig(),
         ...extraBody,
       };
 
@@ -133,10 +135,11 @@ export default function PipelinePage() {
   };
 
   const callStepDirect = async (step: string, body: any): Promise<StepResult> => {
+    const cc = getClientConfig();
     const res = await fetch('/api/pipeline', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ step, ...body }),
+      body: JSON.stringify({ step, ...body, clientConfig: cc }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);

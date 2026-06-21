@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { getClientConfig } from '@/lib/client-config';
 
 interface RuleResult {
   type: string;
@@ -33,7 +34,7 @@ export default function DecisionPage() {
       const res = await fetch('/api/decision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal, budget, targetROI, productId: productId || undefined }),
+        body: JSON.stringify({ goal, budget, targetROI, productId: productId || undefined, clientConfig: getClientConfig() }),
       });
       const data = await res.json();
       setRules(data.rules || []);

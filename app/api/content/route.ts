@@ -11,7 +11,7 @@ const PLATFORM_STYLES: Record<string, string> = {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { productId, platform, contentType, extraInstructions } = body;
+    const { productId, platform, contentType, extraInstructions, clientConfig } = body;
 
     const product = PRODUCTS.find(p => p.id === productId) || PRODUCTS[0];
     const platformStyle = PLATFORM_STYLES[platform] || PLATFORM_STYLES.xiaohongshu;
@@ -79,7 +79,7 @@ ${extraInstructions ? `额外要求：${extraInstructions}` : ''}`;
     const result = await chatCompletion([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
-    ], { temperature: 0.8, maxTokens: 3000 });
+    ], { temperature: 0.8, maxTokens: 3000, clientConfig });
 
     return NextResponse.json({
       content: result,

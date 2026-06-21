@@ -22,14 +22,16 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
     const body = await req.json();
-    const { prompt, systemPrompt, temperature, maxTokens } = body;
+    const { prompt, systemPrompt, temperature, maxTokens, clientConfig } = body;
     const env = readEnv();
-    const apiKey = env.LLM_API_KEY;
-    const baseUrl = env.LLM_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-    const model = env.LLM_MODEL || 'qwen-plus';
+    
+    // 优先使用客户端配置
+    const apiKey = clientConfig?.apiKey || env.LLM_API_KEY;
+    const baseUrl = clientConfig?.baseUrl || env.LLM_BASE_URL || 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
+    const model = clientConfig?.model || env.LLM_MODEL || 'qwen-plus';
 
     if (!apiKey) {
-      return NextResponse.json({ success: false, error: 'API Key not configured. Please set LLM_API_KEY in .env.local' });
+      return NextResponse.json({ success: false, error: 'API Key 未配置。请在「设置」页填入 API Key。' });
     }
 
     const messages = [];
