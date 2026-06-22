@@ -124,6 +124,75 @@ tr:hover td { background: rgba(30,41,59,0.5); }
 .filter-btn { padding: 0.375rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; transition: all 0.15s; background: #1e293b; color: #94a3b8; }
 .filter-btn:hover { color: white; }
 .filter-btn.active { background: #2563eb; color: white; }
+
+/* Pipeline Enhanced Animations */
+@keyframes borderPulse {
+  0%, 100% { border-color: rgba(59,130,246,0.9); box-shadow: 0 0 12px rgba(59,130,246,0.2); }
+  50% { border-color: rgba(59,130,246,0.4); box-shadow: 0 0 24px rgba(59,130,246,0.4); }
+}
+@keyframes dotPulse {
+  0%, 80%, 100% { transform: scale(0.5); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+@keyframes timelinePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.5); }
+  50% { box-shadow: 0 0 0 10px rgba(59,130,246,0); }
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes progressShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes checkPop {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+.step-card-pending { border: 2px dashed #475569 !important; }
+.step-card-running { animation: borderPulse 1.5s ease-in-out infinite; border: 2px solid #3b82f6 !important; }
+.step-card-done { border: 2px solid rgba(34,197,94,0.7) !important; }
+
+.loading-dots { display: inline-flex; gap: 4px; align-items: center; }
+.loading-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #60a5fa; animation: dotPulse 1.4s ease-in-out infinite; }
+.loading-dot:nth-child(2) { animation-delay: 0.16s; }
+.loading-dot:nth-child(3) { animation-delay: 0.32s; }
+
+.tl-node { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #475569; background: #1e293b; transition: all 0.4s ease; position: relative; z-index: 1; }
+.tl-node-done { background: #22c55e; border-color: #22c55e; }
+.tl-node-running { background: #3b82f6; border-color: #3b82f6; animation: timelinePulse 1.5s ease-in-out infinite; }
+
+.md-content h1 { font-size: 1.25rem; font-weight: 700; color: #f1f5f9; margin: 1rem 0 0.5rem; }
+.md-content h2 { font-size: 1.125rem; font-weight: 700; color: #f1f5f9; margin: 0.875rem 0 0.5rem; border-bottom: 1px solid #334155; padding-bottom: 0.375rem; }
+.md-content h3 { font-size: 1rem; font-weight: 600; color: #e2e8f0; margin: 0.75rem 0 0.375rem; }
+.md-content h4 { font-size: 0.9375rem; font-weight: 600; color: #e2e8f0; margin: 0.5rem 0 0.25rem; }
+.md-content ul, .md-content ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+.md-content ul { list-style: disc; }
+.md-content ol { list-style: decimal; }
+.md-content li { margin: 0.3rem 0; line-height: 1.65; color: #cbd5e1; }
+.md-content pre { background: rgba(15,23,42,0.8); padding: 0.875rem 1rem; border-radius: 0.5rem; margin: 0.625rem 0; overflow-x: auto; border: 1px solid #334155; }
+.md-content pre code { background: transparent; padding: 0; font-size: 0.8125rem; color: #e2e8f0; }
+.md-content code { background: rgba(59,130,246,0.15); color: #93c5fd; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.85em; }
+.md-content strong { color: #f1f5f9; font-weight: 600; }
+.md-content em { color: #c084fc; font-style: italic; }
+.md-content p { margin: 0.5rem 0; color: #cbd5e1; line-height: 1.7; }
+.md-content hr { border: none; border-top: 1px solid #334155; margin: 1rem 0; }
+.md-content blockquote { border-left: 3px solid #3b82f6; padding-left: 1rem; margin: 0.5rem 0; color: #94a3b8; }
+.md-content table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
+.md-content th, .md-content td { border: 1px solid #334155; padding: 0.375rem 0.75rem; text-align: left; font-size: 0.8125rem; }
+.md-content th { background: rgba(30,41,59,0.8); color: #94a3b8; font-weight: 600; }
+
+.fade-in-up { animation: fadeInUp 0.4s ease forwards; }
+.check-pop { animation: checkPop 0.3s ease forwards; }
+
+.progress-track { height: 6px; background: #1e293b; border-radius: 9999px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 9999px; transition: width 0.6s ease; background: linear-gradient(90deg, #3b82f6, #6366f1, #22c55e); background-size: 200% 100%; animation: progressShimmer 2s linear infinite; }
+
+.timeline-line { width: 2px; background: #334155; position: absolute; left: 6px; top: 0; bottom: 0; }
+.timeline-line-fill { width: 2px; background: linear-gradient(180deg, #22c55e, #3b82f6); position: absolute; left: 6px; top: 0; transition: height 0.5s ease; }
 `;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -12,6 +12,7 @@ const navItems = [
   { href: '/dashboard', label: '投放看板', icon: '📈' },
   { href: '/lab', label: '真实测试', icon: '🧪' },
   { href: '/status', label: '系统状态', icon: '💚' },
+  { href: '/products', label: '产品库', icon: '📦' },
   { href: '/settings', label: '设置', icon: '⚙️' },
 ];
 
