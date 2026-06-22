@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { chatCompletion } from '@/lib/llm';
+import { callLLM } from '@/lib/llm';
 import { PRODUCTS } from '@/lib/mock-data';
+import { checkCompliance } from '@/lib/compliance';
+import { recordUsage } from '@/lib/analytics';
+import { generateId, countWords } from '@/lib/storage';
 
 const PLATFORM_STYLES: Record<string, string> = {
   xiaohongshu: '小红书种草笔记风格：口语化、emoji多、分段清晰、有标题和tag、像闺蜜分享',
@@ -76,17 +79,43 @@ ${extraInstructions ? `额外要求：${extraInstructions}` : ''}
 ${extraInstructions ? `额外要求：${extraInstructions}` : ''}`;
     }
 
-    const result = await chatCompletion([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ], { temperature: 0.8, maxTokens: 3000, clientConfig });
+    const llmResult = await callLLM(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      clientConfig,
+      0.8,
+      3000
+    );
+
+    // Record usage analytics
+    recordUsage({
+      timestamp: new Date().toISOString(),
+      source: 'content',
+      platform,
+      model: llmResult.model || 'unknown',
+      tokens: llmResult.usage?.totalTokens || 0,
+      elapsed: llmResult.elapsed || 0,
+      contentType,
+    });
+
+    const contentId = generateId();
+    const createdAt = new Date().toISOString();
+
+    // 自动执行违禁词合规检查
+    const compliance = checkCompliance(llmResult.content);
 
     return NextResponse.json({
-      content: result,
+      id: contentId,
+      content: llmResult.content,
       product: product.name,
       platform,
       contentType,
-      createdAt: new Date().toISOString(),
+      createdAt,
+      source: 'content',
+      wordCount: countWords(llmResult.content),
+      compliance,  // 违禁词检查结果
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

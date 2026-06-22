@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { generateId, countWords } from '@/lib/storage';
+import { recordUsage } from '@/lib/analytics';
 
 const ENV_PATH = path.join(process.cwd(), '.env.local');
 
@@ -55,13 +57,34 @@ export async function POST(req: NextRequest) {
     const content = data.choices?.[0]?.message?.content || '';
     const usage = data.usage || {};
 
+    // Record usage analytics
+    recordUsage({
+      timestamp: new Date().toISOString(),
+      source: 'lab',
+      platform: 'lab',
+      model: data.model || model,
+      tokens: usage.total_tokens || 0,
+      elapsed,
+    });
+
     return NextResponse.json({
       success: true,
+      id: generateId(),
       content,
       model: data.model || model,
       usage: { prompt_tokens: usage.prompt_tokens, completion_tokens: usage.completion_tokens, total_tokens: usage.total_tokens },
       elapsed,
       finish_reason: data.choices?.[0]?.finish_reason,
+      _saveInfo: {
+        id: generateId(),
+        content: content,
+        product: 'Lab 测试',
+        platform: 'lab',
+        contentType: 'text',
+        createdAt: new Date().toISOString(),
+        source: 'lab',
+        wordCount: countWords(content),
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message, elapsed: Date.now() - startTime });

@@ -8,6 +8,7 @@ const navItems = [
   { href: '/decision', label: '决策大脑', icon: '🧠' },
   { href: '/content', label: '内容生成', icon: '✍️' },
   { href: '/review', label: '审核队列', icon: '✅' },
+  { href: '/history', label: '历史记录', icon: '📚' },
   { href: '/dashboard', label: '投放看板', icon: '📈' },
   { href: '/lab', label: '真实测试', icon: '🧪' },
   { href: '/status', label: '系统状态', icon: '💚' },

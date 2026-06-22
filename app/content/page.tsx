@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { getClientConfig } from '@/lib/client-config';
+import { saveContent, type StoredContentItem } from '@/lib/storage';
 
 export default function ContentPage() {
   const [productId, setProductId] = useState('p1');
@@ -26,7 +27,22 @@ export default function ContentPage() {
         body: JSON.stringify({ productId, platform, contentType, extraInstructions, clientConfig: getClientConfig() }),
       });
       const data = await res.json();
-      setResult(data.content || data.error);
+      if (data.content) {
+        setResult(data.content);
+        // 自动保存到历史记录
+        saveContent({
+          id: data.id,
+          content: data.content,
+          product: data.product,
+          platform: data.platform,
+          contentType: data.contentType,
+          createdAt: data.createdAt,
+          source: 'content',
+          wordCount: data.wordCount || data.content.length,
+        });
+      } else {
+        setResult(data.error || '生成失败');
+      }
     } catch (err: any) { setResult('生成失败: ' + err.message); }
     finally { setLoading(false); }
   };

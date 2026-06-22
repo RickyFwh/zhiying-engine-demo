@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { chatCompletion } from '@/lib/llm';
+import { callLLM } from '@/lib/llm';
 import { runDecisionEngine } from '@/lib/decision-engine';
+import { recordUsage } from '@/lib/analytics';
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,14 +35,28 @@ ${JSON.stringify(ruleResult, null, 2)}
 
 请基于以上信息给出你的决策建议。`;
 
-    const llmContent = await chatCompletion([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ], { temperature: 0.6, maxTokens: 2000, clientConfig });
+    const llmResult = await callLLM(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      clientConfig,
+      0.6,
+      2000
+    );
+
+    // Record usage analytics
+    recordUsage({
+      timestamp: new Date().toISOString(),
+      source: 'decision',
+      model: llmResult.model || 'unknown',
+      tokens: llmResult.usage?.totalTokens || 0,
+      elapsed: llmResult.elapsed || 0,
+    });
 
     return NextResponse.json({
       rules: ruleResult,
-      llmAnalysis: llmContent,
+      llmAnalysis: llmResult.content,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {

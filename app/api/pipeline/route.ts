@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { generateId, countWords } from '@/lib/storage';
+import { recordUsage } from '@/lib/analytics';
+import { checkCompliance } from '@/lib/compliance';
 
 const ENV_PATH = path.join(process.cwd(), '.env.local');
 
@@ -156,6 +159,19 @@ ${content}
   return { step: 'review', ...result };
 }
 
+function recordStepUsage(result: any, stepName: string, platform?: string, contentType?: string) {
+  recordUsage({
+    timestamp: new Date().toISOString(),
+    source: 'pipeline',
+    platform: platform,
+    model: result.model || 'unknown',
+    tokens: result.usage?.total_tokens || 0,
+    elapsed: result.elapsed || 0,
+    step: stepName,
+    contentType,
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -164,28 +180,62 @@ export async function POST(req: NextRequest) {
 
     if (step === 'strategy') {
       const result = await stepStrategy(body, cc);
+      recordStepUsage(result, 'strategy');
       return NextResponse.json(result);
     }
     if (step === 'competitor') {
       const result = await stepCompetitor(body, strategy || '', cc);
+      recordStepUsage(result, 'competitor');
       return NextResponse.json(result);
     }
     if (step === 'content') {
       const result = await stepContent(body, strategy || '', competitorAnalysis || '', cc);
-      return NextResponse.json(result);
+      recordStepUsage(result, 'content', body.platform, body.contentType);
+      // 自动执行违禁词合规检查
+      const compliance = checkCompliance(result.content);
+      return NextResponse.json({
+        ...result,
+        compliance,  // 违禁词检查结果
+        _saveInfo: {
+          id: generateId(),
+          product: body.products || '',
+          platform: body.platform || 'xiaohongshu',
+          contentType: body.contentType || 'text',
+          source: 'pipeline',
+          wordCount: countWords(result.content),
+          createdAt: new Date().toISOString(),
+        },
+      });
     }
     if (step === 'review') {
       const result = await stepReview(body, strategy || '', competitorAnalysis || '', content || '', cc);
+      recordStepUsage(result, 'review');
       return NextResponse.json(result);
     }
     if (step === 'all') {
       const r1 = await stepStrategy(body, cc);
+      recordStepUsage(r1, 'strategy');
       const r2 = await stepCompetitor(body, r1.content, cc);
+      recordStepUsage(r2, 'competitor');
       const r3 = await stepContent({ ...body, platform: body.platform || 'xiaohongshu', contentType: body.contentType || 'text' }, r1.content, r2.content, cc);
+      recordStepUsage(r3, 'content', body.platform, body.contentType);
       const r4 = await stepReview(body, r1.content, r2.content, r3.content, cc);
+      recordStepUsage(r4, 'review');
+      // 自动执行违禁词合规检查（对生成的内容进行检查）
+      const contentCompliance = checkCompliance(r3.content);
       return NextResponse.json({
         strategy: r1, competitor: r2, content: r3, review: r4,
+        compliance: contentCompliance,  // 违禁词检查结果
         totalElapsed: r1.elapsed + r2.elapsed + r3.elapsed + r4.elapsed,
+        _saveInfo: {
+          id: generateId(),
+          product: body.products || '',
+          platform: body.platform || 'xiaohongshu',
+          contentType: body.contentType || 'text',
+          source: 'pipeline',
+          wordCount: countWords(r3.content),
+          createdAt: new Date().toISOString(),
+        },
       });
     }
 

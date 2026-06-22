@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
 import { getClientConfig } from '@/lib/client-config';
+import { saveContent } from '@/lib/storage';
 
 interface StepResult {
   content: string;
@@ -79,6 +80,12 @@ export default function PipelinePage() {
           model: data.model,
         },
       }));
+
+      // 内容生成步骤完成后自动保存
+      if (step === 'content' && data._saveInfo) {
+        saveContent(data._saveInfo);
+      }
+
       return data.content;
     } catch (err: any) {
       setError(err.message);
@@ -143,6 +150,12 @@ export default function PipelinePage() {
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
+
+    // 内容生成步骤完成后自动保存
+    if (step === 'content' && data._saveInfo) {
+      saveContent(data._saveInfo);
+    }
+
     return { content: data.content, elapsed: data.elapsed, usage: data.usage, model: data.model };
   };
 

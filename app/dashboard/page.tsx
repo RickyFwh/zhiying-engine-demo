@@ -1,33 +1,152 @@
 'use client';
-import { useState, useMemo } from 'react';
-import { BarChart3, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
-import { generateMockMetrics, PRODUCTS } from '@/lib/mock-data';
+import { useState, useEffect } from 'react';
+import { BarChart3, Activity, Clock, Zap, RefreshCw } from 'lucide-react';
 import {
-  LineChart, Line, AreaChart, Area, BarChart, Bar,
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 
+interface AnalyticsData {
+  overview: {
+    totalCalls: number;
+    totalTokens: number;
+    totalElapsed: number;
+    avgTokensPerCall: number;
+    avgElapsed: number;
+    todayCalls: number;
+    weekCalls: number;
+  };
+  platformDistribution: { platform: string; count: number; tokens: number }[];
+  modelDistribution: { model: string; count: number }[];
+  dailyTrend: { date: string; calls: number; tokens: number }[];
+  contentStats: { byType: Record<string, number>; byPlatform: Record<string, number> };
+  recentEntries: {
+    timestamp: string;
+    source: string;
+    platform?: string;
+    model: string;
+    tokens?: number;
+    elapsed?: number;
+    contentType?: string;
+    step?: string;
+  }[];
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  xiaohongshu: '小红书',
+  douyin: '抖音',
+  wechat: '微信',
+  lab: '实验室',
+  unknown: '未知',
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  pipeline: 'Pipeline',
+  lab: 'AI 实验室',
+  content: '内容生成',
+  decision: '决策引擎',
+};
+
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  text: '种草文案',
+  video_script: '视频脚本',
+  image_prompt: '图片提示词',
+};
+
+const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#06b6d4', '#ec4899', '#84cc16'];
+
 export default function DashboardPage() {
-  const [days, setDays] = useState(30);
-  const metrics = useMemo(() => generateMockMetrics(days), [days]);
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const latest = metrics[metrics.length - 1];
-  const prev = metrics[metrics.length - 2];
-  const roiChange = latest.roi - prev.roi;
-  const totalSpend = metrics.reduce((s, m) => s + m.spend, 0);
-  const totalRevenue = metrics.reduce((s, m) => s + m.revenue, 0);
-  const totalConversions = metrics.reduce((s, m) => s + m.conversions, 0);
-  const avgROI = totalRevenue / totalSpend;
-  const avgCTR = metrics.reduce((s, m) => s + m.ctr, 0) / metrics.length;
-  const avgCVR = metrics.reduce((s, m) => s + m.cvr, 0) / metrics.length;
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/analytics');
+      const json = await res.json();
+      setData(json);
+    } catch (err) {
+      console.error('Failed to fetch analytics:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // 按产品模拟分配数据
-  const productData = PRODUCTS.map((p, i) => ({
-    name: p.name,
-    spend: Math.round(totalSpend * (i === 0 ? 0.45 : i === 1 ? 0.3 : 0.25)),
-    revenue: Math.round(totalRevenue * (i === 0 ? 0.5 : i === 1 ? 0.28 : 0.22)),
-    conversions: Math.round(totalConversions * (i === 0 ? 0.48 : i === 1 ? 0.3 : 0.22)),
-    roi: i === 0 ? 2.8 : i === 1 ? 1.9 : 2.1,
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-center" style={{ minHeight: '400px' }}>
+          <div className="text-slate-400 flex items-center gap-2">
+            <RefreshCw className="w-5 h-5 animate-spin" />
+            加载数据中...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data || data.overview.totalCalls === 0) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+            <BarChart3 className="w-8 h-8 text-blue-400" />
+            数据看板
+          </h1>
+          <p className="text-slate-400">实时使用数据统计 · 数据驱动决策优化</p>
+        </div>
+        <div className="card p-6" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+          <BarChart3 className="w-16 h-16 text-slate-600" style={{ margin: '0 auto 1.5rem' }} />
+          <h3 className="text-xl font-semibold text-white mb-2">暂无使用数据</h3>
+          <p className="text-slate-400 mb-4" style={{ maxWidth: '400px', margin: '0 auto' }}>
+            开始使用系统各功能后，这里会自动展示您的使用数据统计。
+          </p>
+          <div className="grid grid-cols-4 gap-3" style={{ maxWidth: '600px', margin: '2rem auto 0' }}>
+            <div style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '0.5rem', padding: '1rem' }}>
+              <p className="text-sm text-blue-400 font-medium">Pipeline</p>
+              <p className="text-xs text-slate-500 mt-1">全链路策略分析</p>
+            </div>
+            <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '0.5rem', padding: '1rem' }}>
+              <p className="text-sm text-green-400 font-medium">内容生成</p>
+              <p className="text-xs text-slate-500 mt-1">多渠道营销内容</p>
+            </div>
+            <div style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: '0.5rem', padding: '1rem' }}>
+              <p className="text-sm text-purple-400 font-medium">AI 实验室</p>
+              <p className="text-xs text-slate-500 mt-1">自由探索 AI 能力</p>
+            </div>
+            <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '0.5rem', padding: '1rem' }}>
+              <p className="text-sm text-yellow-400 font-medium">决策引擎</p>
+              <p className="text-xs text-slate-500 mt-1">智能投放决策</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { overview, platformDistribution, modelDistribution, dailyTrend, contentStats, recentEntries } = data;
+
+  // Transform contentStats for bar chart
+  const contentTypeData = Object.entries(contentStats.byType).map(([type, count]) => ({
+    name: CONTENT_TYPE_LABELS[type] || type,
+    count,
+  }));
+
+  // Transform platformDistribution with labels
+  const platformChartData = platformDistribution.map(p => ({
+    name: PLATFORM_LABELS[p.platform] || p.platform,
+    value: p.count,
+    tokens: p.tokens,
+  }));
+
+  // Transform modelDistribution
+  const modelChartData = modelDistribution.map(m => ({
+    name: m.model,
+    value: m.count,
   }));
 
   return (
@@ -36,193 +155,215 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-            <BarChart3 className="w-8 h-8 text-green-400" />
-            投放数据看板
+            <BarChart3 className="w-8 h-8 text-blue-400" />
+            数据看板
           </h1>
-          <p className="text-slate-400">实时监控投放效果 · 数据驱动决策优化</p>
+          <p className="text-slate-400">实时使用数据统计 · 数据驱动决策优化</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-slate-400" />
-          {[7, 14, 30].map((d) => (
-            <button
-              key={d}
-              onClick={() => setDays(d)}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                days === d ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              {d}天
-            </button>
-          ))}
+        <button onClick={fetchData} className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+          <RefreshCw className="w-4 h-4" />
+          刷新
+        </button>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="card card-blue p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="w-4 h-4 text-blue-400" />
+            <span className="text-sm text-slate-400">总调用次数</span>
+          </div>
+          <p className="text-2xl font-bold text-white">{overview.totalCalls}</p>
+          <p className="text-xs text-slate-500 mt-1">本周 {overview.weekCalls} 次 · 今日 {overview.todayCalls} 次</p>
+        </div>
+        <div className="card card-green p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Zap className="w-4 h-4 text-green-400" />
+            <span className="text-sm text-slate-400">总 Token 消耗</span>
+          </div>
+          <p className="text-2xl font-bold text-white">{overview.totalTokens.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 mt-1">平均 {overview.avgTokensPerCall.toLocaleString()} / 次</p>
+        </div>
+        <div className="card card-purple p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <BarChart3 className="w-4 h-4 text-purple-400" />
+            <span className="text-sm text-slate-400">今日调用</span>
+          </div>
+          <p className="text-2xl font-bold text-white">{overview.todayCalls}</p>
+          <p className="text-xs text-slate-500 mt-1">本周累计 {overview.weekCalls} 次</p>
+        </div>
+        <div className="card card-yellow p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock className="w-4 h-4 text-yellow-400" />
+            <span className="text-sm text-slate-400">平均响应时间</span>
+          </div>
+          <p className="text-2xl font-bold text-white">{(overview.avgElapsed / 1000).toFixed(1)}s</p>
+          <p className="text-xs text-slate-500 mt-1">总计 {(overview.totalElapsed / 1000 / 60).toFixed(1)} 分钟</p>
         </div>
       </div>
 
-      {/* KPI Row */}
-      <div className="grid grid-cols-5 gap-4">
-        <StatCard label="总消耗" value={`¥${totalSpend.toLocaleString()}`} sub={`${days}天累计`} />
-        <StatCard label="总营收" value={`¥${totalRevenue.toLocaleString()}`} sub={`${days}天累计`} />
-        <StatCard
-          label="平均ROI"
-          value={avgROI.toFixed(2)}
-          sub={roiChange >= 0 ? `+${roiChange.toFixed(2)} vs昨日` : `${roiChange.toFixed(2)} vs昨日`}
-          positive={roiChange >= 0}
-        />
-        <StatCard label="总转化" value={totalConversions.toString()} sub={`${days}天累计`} />
-        <StatCard label="平均CTR" value={`${avgCTR.toFixed(2)}%`} sub="点击率" />
-      </div>
-
-      {/* Charts Row */}
+      {/* Charts Row 1 */}
       <div className="grid grid-cols-2 gap-6">
-        {/* ROI Trend */}
+        {/* Daily Trend - Line Chart */}
         <div className="card p-6">
-          <h3 className="text-white font-semibold mb-4">ROI 趋势</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={metrics}>
-              <defs>
-                <linearGradient id="roiGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
+          <h3 className="text-white font-semibold mb-4">每日调用趋势（最近7天）</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={dailyTrend}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: '#64748b', fontSize: 11 }}
+                tickFormatter={(v) => v.slice(5)}
+              />
               <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
               <Tooltip
                 contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
                 labelStyle={{ color: '#94a3b8' }}
+                formatter={(value: number, name: string) => [value, name === 'calls' ? '调用次数' : 'Token 数']}
+                labelFormatter={(label) => `日期: ${label}`}
               />
-              <Area type="monotone" dataKey="roi" stroke="#3b82f6" fill="url(#roiGradient)" strokeWidth={2} name="ROI" />
-            </AreaChart>
+              <Legend formatter={(value) => value === 'calls' ? '调用次数' : 'Token 数'} />
+              <Line type="monotone" dataKey="calls" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} name="calls" />
+              <Line type="monotone" dataKey="tokens" stroke="#22c55e" strokeWidth={2} dot={{ fill: '#22c55e', r: 4 }} name="tokens" />
+            </LineChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Spend vs Revenue */}
+        {/* Platform Distribution - Pie Chart */}
         <div className="card p-6">
-          <h3 className="text-white font-semibold mb-4">消耗 vs 营收</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={metrics}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
-              <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-                labelStyle={{ color: '#94a3b8' }}
-              />
-              <Legend />
-              <Bar dataKey="spend" fill="#ef4444" name="消耗" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="revenue" fill="#22c55e" name="营收" radius={[2, 2, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* CTR & CVR Trend */}
-      <div className="card p-6">
-        <h3 className="text-white font-semibold mb-4">CTR & CVR 趋势</h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={metrics}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
-            <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
-            <Tooltip
-              contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
-              labelStyle={{ color: '#94a3b8' }}
-            />
-            <Legend />
-            <Line type="monotone" dataKey="ctr" stroke="#a78bfa" strokeWidth={2} name="CTR %" dot={false} />
-            <Line type="monotone" dataKey="cvr" stroke="#f59e0b" strokeWidth={2} name="CVR %" dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Product Performance */}
-      <div className="card p-6">
-        <h3 className="text-white font-semibold mb-4">产品投放效果对比</h3>
-        <div className="grid grid-cols-3 gap-4">
-          {productData.map((p, i) => (
-            <div key={i} className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-              <h4 className="text-white font-medium mb-3">{p.name}</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">消耗</span>
-                  <span className="text-red-400">¥{p.spend.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">营收</span>
-                  <span className="text-green-400">¥{p.revenue.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">转化</span>
-                  <span className="text-white">{p.conversions}</span>
-                </div>
-                <div className="flex justify-between border-t border-slate-700 pt-2 mt-2">
-                  <span className="text-slate-400 font-medium">ROI</span>
-                  <span className={`font-bold ${p.roi >= 2 ? 'text-green-400' : 'text-yellow-400'}`}>
-                    {p.roi.toFixed(1)}
-                  </span>
-                </div>
-              </div>
+          <h3 className="text-white font-semibold mb-4">平台使用分布</h3>
+          {platformChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={platformChartData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={{ stroke: '#64748b' }}
+                >
+                  {platformChartData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
+                  formatter={(value: number, name: string, props: any) => [`${value} 次 (${(props.payload.tokens || 0).toLocaleString()} tokens)`, props.payload.name]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center" style={{ height: '260px' }}>
+              <p className="text-slate-500">暂无平台数据</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
-      {/* Active Campaigns */}
-      <div className="card p-6">
-        <h3 className="text-white font-semibold mb-4">运行中的投放计划</h3>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-slate-400 border-b border-slate-700">
-              <th className="text-left py-2">计划名称</th>
-              <th className="text-left py-2">平台</th>
-              <th className="text-right py-2">日预算</th>
-              <th className="text-right py-2">消耗</th>
-              <th className="text-right py-2">ROI</th>
-              <th className="text-center py-2">状态</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              { name: '烟酰胺-拉新-信息流', platform: '千川', budget: 300, spend: 285, roi: 2.8, status: 'running' },
-              { name: '头皮精华-种草-搜索', platform: '聚光', budget: 200, spend: 178, roi: 1.9, status: 'running' },
-              { name: '玻色因-品牌-开屏', platform: '千川', budget: 150, spend: 52, roi: 2.1, status: 'running' },
-              { name: '烟酰胺-复购-私信', platform: '聚光', budget: 100, spend: 0, roi: 0, status: 'paused' },
-            ].map((c, i) => (
-              <tr key={i} className="border-b border-slate-800 hover:bg-slate-800/50">
-                <td className="py-3 text-white">{c.name}</td>
-                <td className="py-3 text-slate-400">{c.platform}</td>
-                <td className="py-3 text-right text-slate-300">¥{c.budget}</td>
-                <td className="py-3 text-right text-red-400">¥{c.spend}</td>
-                <td className="py-3 text-right">
-                  <span className={c.roi >= 2 ? 'text-green-400' : c.roi > 0 ? 'text-yellow-400' : 'text-slate-500'}>
-                    {c.roi > 0 ? c.roi.toFixed(1) : '-'}
-                  </span>
-                </td>
-                <td className="py-3 text-center">
-                  <span className={c.status === 'running' ? 'badge-green' : 'badge-yellow'}>
-                    {c.status === 'running' ? '投放中' : '已暂停'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+      {/* Charts Row 2 */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Content Type Distribution - Bar Chart */}
+        <div className="card p-6">
+          <h3 className="text-white font-semibold mb-4">内容类型分布</h3>
+          {contentTypeData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={contentTypeData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} />
+                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
+                  labelStyle={{ color: '#94a3b8' }}
+                  formatter={(value: number) => [value + ' 次', '生成次数']}
+                />
+                <Bar dataKey="count" fill="#a855f7" radius={[4, 4, 0, 0]} name="生成次数" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center" style={{ height: '260px' }}>
+              <p className="text-slate-500">暂无内容类型数据</p>
+            </div>
+          )}
+        </div>
 
-function StatCard({ label, value, sub, positive }: { label: string; value: string; sub: string; positive?: boolean }) {
-  return (
-    <div className="card p-4">
-      <p className="text-sm text-slate-400 mb-1">{label}</p>
-      <p className="text-2xl font-bold text-white">{value}</p>
-      <p className={`text-xs mt-1 flex items-center gap-1 ${
-        positive === undefined ? 'text-slate-500' : positive ? 'text-green-400' : 'text-red-400'
-      }`}>
-        {positive !== undefined && (positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />)}
-        {sub}
-      </p>
+        {/* Model Distribution - Pie Chart */}
+        <div className="card p-6">
+          <h3 className="text-white font-semibold mb-4">模型使用分布</h3>
+          {modelChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={modelChartData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name.length > 12 ? name.slice(0, 12) + '…' : name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={{ stroke: '#64748b' }}
+                >
+                  {modelChartData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
+                  formatter={(value: number, _name: string, props: any) => [`${value} 次`, props.payload.name]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center" style={{ height: '260px' }}>
+              <p className="text-slate-500">暂无模型数据</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent Entries */}
+      <div className="card p-6">
+        <h3 className="text-white font-semibold mb-4">最近使用记录</h3>
+        {recentEntries.length > 0 ? (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-slate-400 border-b" style={{ borderColor: '#334155' }}>
+                <th className="text-left py-2">时间</th>
+                <th className="text-left py-2">来源</th>
+                <th className="text-left py-2">平台</th>
+                <th className="text-left py-2">模型</th>
+                <th className="text-right py-2">Token</th>
+                <th className="text-right py-2">耗时</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentEntries.map((entry, i) => (
+                <tr key={i} className="border-b" style={{ borderColor: '#1e293b' }}>
+                  <td className="py-3 text-slate-300">
+                    {new Date(entry.timestamp).toLocaleString('zh-CN', {
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </td>
+                  <td className="py-3">
+                    <span className="badge badge-blue">{SOURCE_LABELS[entry.source] || entry.source}{entry.step ? ` / ${entry.step}` : ''}</span>
+                  </td>
+                  <td className="py-3 text-slate-400">{PLATFORM_LABELS[entry.platform || ''] || entry.platform || '-'}</td>
+                  <td className="py-3 text-slate-300" style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {entry.model}
+                  </td>
+                  <td className="py-3 text-right text-slate-300">{entry.tokens ? entry.tokens.toLocaleString() : '-'}</td>
+                  <td className="py-3 text-right text-slate-300">{entry.elapsed ? (entry.elapsed / 1000).toFixed(1) + 's' : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="text-slate-500 text-center py-4">暂无记录</p>
+        )}
+      </div>
     </div>
   );
 }

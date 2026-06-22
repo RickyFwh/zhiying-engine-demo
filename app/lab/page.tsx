@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { getClientConfig } from '@/lib/client-config';
+import { saveContent } from '@/lib/storage';
 
 interface LabResult {
   content: string;
@@ -48,6 +49,10 @@ export default function LabPage() {
       if (data.success) {
         setResult(data);
         setHistory(prev => [{ prompt: prompt.slice(0, 50), time: new Date().toLocaleTimeString('zh-CN'), tokens: data.usage?.total_tokens || 0 }, ...prev].slice(0, 20));
+        // 测试成功后自动保存到历史记录
+        if (data._saveInfo) {
+          saveContent(data._saveInfo);
+        }
       } else {
         setError(data.error || 'Unknown error');
       }
