@@ -1,8 +1,18 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { getClientConfig } from '@/lib/client-config';
 import { getImageConfig, getVideoConfig, type MediaConfig } from '@/lib/media-config';
 import { saveContent, type StoredContentItem } from '@/lib/storage';
+
+// Toast type definition
+type ToastType = 'success' | 'error' | 'info';
+interface Toast {
+  id: string;
+  type: ToastType;
+  message: string;
+  timestamp: number;
+  exiting?: boolean;
+}
 
 export default function ContentPage() {
   const [productId, setProductId] = useState('p1');
@@ -30,6 +40,35 @@ export default function ContentPage() {
   const [videoResult, setVideoResult] = useState<{ videoUrl: string; script: string; model: string } | null>(null);
   const [videoError, setVideoError] = useState('');
 
+  // Toast 状态
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Refs for auto-scroll
+  const imageSectionRef = useRef<HTMLDivElement>(null);
+  const videoSectionRef = useRef<HTMLDivElement>(null);
+
+  // Toast functions
+  const addToast = useCallback((type: ToastType, message: string) => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const newToast: Toast = { id, type, message, timestamp: Date.now() };
+    setToasts(prev => [...prev, newToast]);
+
+    // Auto-remove after 3 seconds with exit animation
+    setTimeout(() => {
+      setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, 300);
+    }, 3000);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 300);
+  }, []);
+
   const productNames: Record<string, string> = { p1: '烟酰胺精华', p2: '头皮精华', p3: '玻色因面霜' };
   const platformNames: Record<string, string> = { xiaohongshu: '小红书', douyin: '抖音', wechat: '微信' };
   const contentTypeLabels: Record<string, string> = { text: '种草文案', video_script: '视频脚本', image_prompt: '图片提示词' };
@@ -43,6 +82,89 @@ export default function ContentPage() {
     setImageConfig(getImageConfig());
     setVideoConfig(getVideoConfig());
   }, []);
+
+  // Toast 触发: 图片结果变化
+  useEffect(() => {
+    if (imageResult) {
+      addToast('success', '🎨 图片生成完成！');
+    }
+  }, [imageResult, addToast]);
+
+  useEffect(() => {
+    if (imageError) {
+      addToast('error', '❌ 图片生成失败');
+    }
+  }, [imageError, addToast]);
+
+  // Toast 触发: 视频结果变化
+  useEffect(() => {
+    if (videoResult) {
+      addToast('success', '🎬 视频生成完成！');
+    }
+  }, [videoResult, addToast]);
+
+  useEffect(() => {
+    if (videoError) {
+      addToast('error', '❌ 视频生成失败');
+    }
+  }, [videoError, addToast]);
+
+  // Auto-scroll: 图片区域
+  useEffect(() => {
+    if ((imageLoading || imageResult) && imageSectionRef.current) {
+      setTimeout(() => {
+        imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
+  }, [imageLoading, imageResult]);
+
+  // Auto-scroll: 视频区域
+  useEffect(() => {
+    if ((videoLoading || videoResult) && videoSectionRef.current) {
+      setTimeout(() => {
+        videoSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
+  }, [videoLoading, videoResult]);
+
+  // 进度计算
+  const getProgress = () => {
+    if (!result) return 0;
+    let progress = 33; // 文案完成
+    if (imageEnabled) {
+      if (imageResult) progress += 33; // 图片完成
+    } else {
+      // 如果图片未启用，按比比例算
+      if (!videoEnabled) return 100; // 只有文案，直接100%
+    }
+    if (videoEnabled) {
+      if (videoResult) progress = imageEnabled ? 100 : 66; // 视频完成
+    } else {
+      if (imageEnabled && imageResult) progress = 100; // 图片完成且无视频
+      else if (!imageEnabled) progress = 100;
+    }
+    // 修正逻辑
+    if (imageEnabled && !imageResult && !imageLoading) {
+      // 图片启用但未生成（可能出错）
+    }
+    if (videoEnabled && !videoResult && !videoLoading) {
+      // 视频启用但未生成（可能出错）
+    }
+    return Math.min(progress, 100);
+  };
+
+  // 简化进度计算
+  const progressPercent = (() => {
+    if (!result) return 0;
+    const totalSteps = 1 + (imageEnabled ? 1 : 0) + (videoEnabled ? 1 : 0);
+    let completedSteps = 1; // 文案已完成
+    if (imageEnabled && imageResult) completedSteps++;
+    if (videoEnabled && videoResult) completedSteps++;
+    // 如果有error也算完成（不再等待）
+    if (imageEnabled && imageError && !imageLoading) completedSteps++;
+    if (videoEnabled && videoError && !videoLoading) completedSteps++;
+    return Math.round((completedSteps / totalSteps) * 100);
+  })();
 
   const handleImageToggle = (val: boolean) => {
     setImageEnabled(val);
@@ -275,8 +397,27 @@ export default function ContentPage() {
     </div>
   );
 
+  // Toast 容器组件
+  const ToastContainer = () => (
+    <div className="toast-container">
+      {toasts.map(toast => (
+        <div
+          key={toast.id}
+          className={`toast-item toast-${toast.type}${toast.exiting ? ' toast-exit' : ''}`}
+          onClick={() => removeToast(toast.id)}
+          style={{ cursor: 'pointer' }}
+        >
+          <span>{toast.message}</span>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div className="space-y-8">
+      {/* Toast 通知容器 */}
+      <ToastContainer />
+
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">✍️ 内容生成器</h1>
         <p className="text-slate-400">AI 驱动的多渠道营销内容自动生成</p>
@@ -363,6 +504,30 @@ export default function ContentPage() {
 
       {result && (
         <div className="card p-6">
+          {/* 进度指示器 */}
+          {(imageEnabled || videoEnabled) && (
+            <div style={{ marginBottom: '1rem' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-slate-400">生成进度</span>
+                <span className="text-xs font-medium" style={{ color: progressPercent === 100 ? '#4ade80' : '#60a5fa' }}>
+                  {progressPercent}%
+                </span>
+              </div>
+              <div className="content-progress-track">
+                <div className="content-progress-fill" style={{ width: `${progressPercent}%` }} />
+              </div>
+              <div className="flex items-center gap-3 text-xs text-slate-500">
+                <span style={{ color: result ? '#4ade80' : '#64748b' }}>📝 文案</span>
+                {imageEnabled && (
+                  <span style={{ color: imageResult ? '#4ade80' : imageLoading ? '#60a5fa' : '#64748b' }}>🎨 图片</span>
+                )}
+                {videoEnabled && (
+                  <span style={{ color: videoResult ? '#4ade80' : videoLoading ? '#60a5fa' : '#64748b' }}>🎬 视频</span>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
               📝 文案结果 <span className="badge badge-green">AI 已生成</span>
@@ -379,6 +544,66 @@ export default function ContentPage() {
             <span className="badge badge-purple">平台：{platformNames[platform]}</span>
             <span className="badge badge-green">类型：{contentTypeLabels[contentType]}</span>
           </div>
+
+          {/* 生成状态条 - 图片 */}
+          {imageEnabled && (
+            <div className={`gen-status-bar ${imageResult ? 'gen-status-done' : imageLoading ? 'gen-status-loading' : imageError ? 'gen-status-error' : 'gen-status-loading'}`}>
+              {imageLoading && (
+                <>
+                  <span className="loading-dots">
+                    <span className="loading-dot"></span>
+                    <span className="loading-dot"></span>
+                    <span className="loading-dot"></span>
+                  </span>
+                  <span>🎨 图片正在生成中...</span>
+                </>
+              )}
+              {imageResult && (
+                <>
+                  <span>✅ 图片已生成</span>
+                  <a href="#image-section" onClick={(e) => { e.preventDefault(); imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>
+                    ↓ 查看图片
+                  </a>
+                </>
+              )}
+              {imageError && !imageLoading && (
+                <span>❌ 图片生成失败: {imageError}</span>
+              )}
+              {!imageLoading && !imageResult && !imageError && (
+                <span>🎨 等待图片生成...</span>
+              )}
+            </div>
+          )}
+
+          {/* 生成状态条 - 视频 */}
+          {videoEnabled && (
+            <div className={`gen-status-bar ${videoResult ? 'gen-status-done' : videoLoading ? 'gen-status-loading' : videoError ? 'gen-status-error' : 'gen-status-loading'}`}>
+              {videoLoading && (
+                <>
+                  <span className="loading-dots">
+                    <span className="loading-dot"></span>
+                    <span className="loading-dot"></span>
+                    <span className="loading-dot"></span>
+                  </span>
+                  <span>🎬 视频正在生成中...</span>
+                </>
+              )}
+              {videoResult && (
+                <>
+                  <span>✅ 视频已生成</span>
+                  <a href="#video-section" onClick={(e) => { e.preventDefault(); videoSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>
+                    ↓ 查看视频
+                  </a>
+                </>
+              )}
+              {videoError && !videoLoading && (
+                <span>❌ 视频生成失败: {videoError}</span>
+              )}
+              {!videoLoading && !videoResult && !videoError && (
+                <span>🎬 等待视频生成...</span>
+              )}
+            </div>
+          )}
 
           <div style={{ borderTop: '1px solid var(--slate-700)', marginTop: '1.5rem', paddingTop: '1.5rem' }}>
             <h3 className="text-sm font-semibold text-white mb-3">📤 导出与发布</h3>
@@ -413,7 +638,7 @@ export default function ContentPage() {
 
       {/* ========== 图片生成结果区 ========== */}
       {(imageEnabled || imageResult || imageLoading || imageError) && (
-        <div className="card p-6">
+        <div id="image-section" ref={imageSectionRef} className={`card p-6 ${imageLoading ? 'media-pulse' : ''}`}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
               🎨 图片生成 <span className="badge badge-blue">{imageConfig ? imageConfig.provider : '未配置'}</span>
@@ -491,7 +716,7 @@ export default function ContentPage() {
 
       {/* ========== 视频生成结果区 ========== */}
       {(videoEnabled || videoResult || videoLoading || videoError) && (
-        <div className="card p-6">
+        <div id="video-section" ref={videoSectionRef} className={`card p-6 ${videoLoading ? 'media-pulse' : ''}`}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
               🎬 视频生成 <span className="badge badge-purple">{videoConfig ? videoConfig.provider : '未配置'}</span>

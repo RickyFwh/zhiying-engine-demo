@@ -193,6 +193,94 @@ tr:hover td { background: rgba(30,41,59,0.5); }
 
 .timeline-line { width: 2px; background: #334155; position: absolute; left: 6px; top: 0; bottom: 0; }
 .timeline-line-fill { width: 2px; background: linear-gradient(180deg, #22c55e, #3b82f6); position: absolute; left: 6px; top: 0; transition: height 0.5s ease; }
+
+/* Toast Notifications */
+@keyframes toastSlideIn {
+  from { transform: translateX(120%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes toastFadeOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(120%); opacity: 0; }
+}
+.toast-container {
+  position: fixed; top: 1.5rem; right: 1.5rem; z-index: 9999;
+  display: flex; flex-direction: column; gap: 0.75rem;
+  pointer-events: none; max-width: 360px;
+}
+.toast-item {
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.875rem 1.25rem; border-radius: 0.75rem;
+  font-size: 0.875rem; font-weight: 500; line-height: 1.4;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3);
+  animation: toastSlideIn 0.35s cubic-bezier(0.21,1.02,0.73,1) forwards;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.toast-item.toast-exit {
+  animation: toastFadeOut 0.3s ease forwards;
+}
+.toast-success {
+  background: linear-gradient(135deg, rgba(34,197,94,0.92), rgba(22,163,74,0.92));
+  color: #fff;
+}
+.toast-error {
+  background: linear-gradient(135deg, rgba(239,68,68,0.92), rgba(185,28,28,0.92));
+  color: #fff;
+}
+.toast-info {
+  background: linear-gradient(135deg, rgba(59,130,246,0.92), rgba(37,99,235,0.92));
+  color: #fff;
+}
+
+/* Media Pulse Animation */
+@keyframes mediaPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(59,130,246,0); }
+}
+.media-pulse {
+  animation: mediaPulse 2s ease-in-out infinite;
+}
+
+/* Generation Status Bar */
+.gen-status-bar {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.75rem 1rem; border-radius: 0.5rem;
+  font-size: 0.875rem; font-weight: 500;
+  transition: all 0.3s ease;
+  margin-top: 0.75rem;
+}
+.gen-status-loading {
+  background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); color: #60a5fa;
+}
+.gen-status-done {
+  background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: #4ade80;
+}
+.gen-status-error {
+  background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #f87171;
+}
+.gen-status-bar a {
+  color: inherit; text-decoration: underline; text-underline-offset: 2px;
+}
+
+/* Content Progress Bar */
+@keyframes progressGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.content-progress-track {
+  height: 8px; background: #1e293b; border-radius: 9999px; overflow: hidden;
+  margin-bottom: 1rem;
+}
+.content-progress-fill {
+  height: 100%; border-radius: 9999px;
+  transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #22c55e, #3b82f6);
+  background-size: 300% 100%;
+  animation: progressGradient 3s ease infinite;
+}
 `;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
