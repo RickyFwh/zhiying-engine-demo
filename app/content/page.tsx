@@ -1,6 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getClientConfig } from '@/lib/client-config';
+import { getImageConfig, getVideoConfig, type MediaConfig } from '@/lib/media-config';
 import { saveContent, type StoredContentItem } from '@/lib/storage';
 
 export default function ContentPage() {
@@ -15,12 +16,72 @@ export default function ContentPage() {
   const [publishing, setPublishing] = useState(false);
   const [publishMsg, setPublishMsg] = useState('');
 
+  // 图片/视频开关状态
+  const [imageEnabled, setImageEnabled] = useState(false);
+  const [videoEnabled, setVideoEnabled] = useState(false);
+  const [imageConfig, setImageConfig] = useState<MediaConfig | null>(null);
+  const [videoConfig, setVideoConfig] = useState<MediaConfig | null>(null);
+
+  // 图片/视频生成结果
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageResult, setImageResult] = useState<{ imageUrl: string; prompt: string; model: string } | null>(null);
+  const [imageError, setImageError] = useState('');
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoResult, setVideoResult] = useState<{ videoUrl: string; script: string; model: string } | null>(null);
+  const [videoError, setVideoError] = useState('');
+
   const productNames: Record<string, string> = { p1: '烟酰胺精华', p2: '头皮精华', p3: '玻色因面霜' };
   const platformNames: Record<string, string> = { xiaohongshu: '小红书', douyin: '抖音', wechat: '微信' };
   const contentTypeLabels: Record<string, string> = { text: '种草文案', video_script: '视频脚本', image_prompt: '图片提示词' };
 
+  // 加载开关状态和配置
+  useEffect(() => {
+    const imgToggle = localStorage.getItem('zhiying_image_toggle');
+    const vidToggle = localStorage.getItem('zhiying_video_toggle');
+    if (imgToggle === 'true') setImageEnabled(true);
+    if (vidToggle === 'true') setVideoEnabled(true);
+    setImageConfig(getImageConfig());
+    setVideoConfig(getVideoConfig());
+  }, []);
+
+  const handleImageToggle = (val: boolean) => {
+    setImageEnabled(val);
+    localStorage.setItem('zhiying_image_toggle', val ? 'true' : 'false');
+    if (val) setImageConfig(getImageConfig()); // 重新读取配置
+  };
+
+  const handleVideoToggle = (val: boolean) => {
+    setVideoEnabled(val);
+    localStorage.setItem('zhiying_video_toggle', val ? 'true' : 'false');
+    if (val) setVideoConfig(getVideoConfig()); // 重新读取配置
+  };
+
+  // 生成图片提示词
+  const generateImagePrompt = (content: string): string => {
+    // 从生成的文案中提取关键信息生成图片提示词
+    const productName = productNames[productId];
+    const platformName = platformNames[platform];
+    return `为${productName}产品生成一张适合${platformName}平台的营销图片。风格：高端、精致、自然。画面：产品居中展示，背景为清新的自然植物元素，光线柔和明亮，色调以白色、绿色为主。产品包装清晰可见，整体氛围传达天然、科技、有效的品牌理念。高质量商业摄影风格，4K分辨率。`;
+  };
+
+  // 生成视频脚本摘要
+  const generateVideoScript = (content: string): string => {
+    const productName = productNames[productId];
+    return `【视频脚本 - ${productName}】\n\n` +
+      `场景1（0-3秒）：产品特写，柔光照射，品牌logo淡入\n` +
+      `场景2（3-8秒）：模特使用产品的近景镜头，展示质地和使用方法\n` +
+      `场景3（8-15秒）：效果对比或使用前后变化\n` +
+      `场景4（15-20秒）：模特满意微笑，产品展示+购买引导\n\n` +
+      `配音旁白：基于生成的文案内容进行语音转换\n` +
+      `背景音乐：轻快、时尚风格的纯音乐\n` +
+      `时长：20秒\n` +
+      `分辨率：1080x1920（竖屏）`;
+  };
+
   const generateContent = async () => {
     setLoading(true); setResult(''); setExportMsg(''); setPublishMsg('');
+    setImageResult(null); setImageError('');
+    setVideoResult(null); setVideoError('');
     try {
       const res = await fetch('/api/content', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -40,6 +101,15 @@ export default function ContentPage() {
           source: 'content',
           wordCount: data.wordCount || data.content.length,
         });
+
+        // 如果图片开关开启，同时生成图片
+        if (imageEnabled) {
+          generateImage(data.content);
+        }
+        // 如果视频开关开启，同时生成视频
+        if (videoEnabled) {
+          generateVideo(data.content);
+        }
       } else {
         setResult(data.error || '生成失败');
       }
@@ -47,8 +117,80 @@ export default function ContentPage() {
     finally { setLoading(false); }
   };
 
-  const copyToClipboard = (target: string) => {
-    navigator.clipboard.writeText(result);
+  // 单独触发图片生成
+  const generateImage = async (content?: string) => {
+    const freshConfig = getImageConfig();
+    setImageConfig(freshConfig);
+    if (!freshConfig || !freshConfig.apiKey) {
+      setImageError('请先在设置页配置图片生成 API');
+      return;
+    }
+    setImageLoading(true);
+    setImageError('');
+    setImageResult(null);
+    try {
+      const textContent = content || result;
+      const imgPrompt = generateImagePrompt(textContent);
+      const res = await fetch('/api/image-gen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: imgPrompt,
+          productInfo: { name: productNames[productId] },
+          platform,
+          mediaConfig: freshConfig,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setImageResult({ imageUrl: data.imageUrl, prompt: data.prompt, model: data.model });
+      } else {
+        setImageError(data.error || '图片生成失败');
+      }
+    } catch (err: any) {
+      setImageError('图片生成错误: ' + err.message);
+    }
+    setImageLoading(false);
+  };
+
+  // 单独触发视频生成
+  const generateVideo = async (content?: string) => {
+    const freshConfig = getVideoConfig();
+    setVideoConfig(freshConfig);
+    if (!freshConfig || !freshConfig.apiKey) {
+      setVideoError('请先在设置页配置视频生成 API');
+      return;
+    }
+    setVideoLoading(true);
+    setVideoError('');
+    setVideoResult(null);
+    try {
+      const textContent = content || result;
+      const vidScript = generateVideoScript(textContent);
+      const res = await fetch('/api/video-gen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          script: vidScript,
+          productInfo: { name: productNames[productId] },
+          platform,
+          mediaConfig: freshConfig,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVideoResult({ videoUrl: data.videoUrl, script: data.script, model: data.model });
+      } else {
+        setVideoError(data.error || '视频生成失败');
+      }
+    } catch (err: any) {
+      setVideoError('视频生成错误: ' + err.message);
+    }
+    setVideoLoading(false);
+  };
+
+  const copyToClipboard = (target: string, text?: string) => {
+    navigator.clipboard.writeText(text || result);
     setCopied(target); setTimeout(() => setCopied(''), 2000);
   };
 
@@ -102,6 +244,37 @@ export default function ContentPage() {
     setExportMsg('已复制脚本，请粘贴到千川广告平台或视频编辑工具'); setTimeout(() => setCopied(''), 2000);
   };
 
+  // Toggle 开关组件
+  const ToggleSwitch = ({ enabled, onToggle, label, icon }: { enabled: boolean; onToggle: (v: boolean) => void; label: string; icon: string }) => (
+    <div
+      onClick={() => onToggle(!enabled)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+        padding: '8px 14px', borderRadius: 8,
+        background: enabled ? '#6c5ce722' : '#111',
+        border: enabled ? '1px solid #6c5ce7' : '1px solid #333',
+        transition: 'all 0.2s',
+      }}
+    >
+      <span style={{ fontSize: 18 }}>{icon}</span>
+      <span style={{ color: enabled ? '#a29bfe' : '#888', fontSize: 14, fontWeight: 500 }}>{label}</span>
+      <div style={{
+        width: 40, height: 22, borderRadius: 11,
+        background: enabled ? '#6c5ce7' : '#444',
+        position: 'relative', transition: 'all 0.2s',
+        marginLeft: 'auto',
+      }}>
+        <div style={{
+          width: 18, height: 18, borderRadius: 9,
+          background: '#fff',
+          position: 'absolute', top: 2,
+          left: enabled ? 20 : 2,
+          transition: 'all 0.2s',
+        }} />
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-8">
       <div>
@@ -142,6 +315,45 @@ export default function ContentPage() {
             </button>
           </div>
         </div>
+
+        {/* 图片/视频生成开关 */}
+        <div style={{ marginBottom: 16 }}>
+          <label className="block text-sm text-slate-400 mb-2">附加媒体生成</label>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <ToggleSwitch
+              enabled={imageEnabled}
+              onToggle={handleImageToggle}
+              label="同时生成图片"
+              icon="🎨"
+            />
+            <ToggleSwitch
+              enabled={videoEnabled}
+              onToggle={handleVideoToggle}
+              label="同时生成视频"
+              icon="🎬"
+            />
+          </div>
+          {/* 警告提示 */}
+          {imageEnabled && !imageConfig && (
+            <div style={{
+              marginTop: 8, padding: '8px 14px', borderRadius: 8,
+              background: '#f39c1222', color: '#f39c12', fontSize: 13,
+              border: '1px solid #f39c1244',
+            }}>
+              ⚠️ 图片生成已开启，但尚未配置 API。请在「设置」页面配置图片生成 API。
+            </div>
+          )}
+          {videoEnabled && !videoConfig && (
+            <div style={{
+              marginTop: 8, padding: '8px 14px', borderRadius: 8,
+              background: '#f39c1222', color: '#f39c12', fontSize: 13,
+              border: '1px solid #f39c1244',
+            }}>
+              ⚠️ 视频生成已开启，但尚未配置 API。请在「设置」页面配置视频生成 API。
+            </div>
+          )}
+        </div>
+
         <div>
           <label className="block text-sm text-slate-400 mb-2">额外要求（可选）</label>
           <input type="text" value={extraInstructions} onChange={e => setExtraInstructions(e.target.value)}
@@ -153,7 +365,7 @@ export default function ContentPage() {
         <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              生成结果 <span className="badge badge-green">AI 已生成</span>
+              📝 文案结果 <span className="badge badge-green">AI 已生成</span>
             </h2>
             <button onClick={() => copyToClipboard('raw')} className="btn-secondary text-sm">
               {copied === 'raw' ? '✅ 已复制!' : '📋 复制全文'}
@@ -196,6 +408,153 @@ export default function ContentPage() {
             {exportMsg && <div className="text-xs text-green-400 mt-2">{exportMsg}</div>}
             {publishMsg && <div className={'text-xs mt-2 ' + (publishMsg.includes('已上传') ? 'text-green-400' : 'text-yellow-400')}>{publishMsg}</div>}
           </div>
+        </div>
+      )}
+
+      {/* ========== 图片生成结果区 ========== */}
+      {(imageEnabled || imageResult || imageLoading || imageError) && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              🎨 图片生成 <span className="badge badge-blue">{imageConfig ? imageConfig.provider : '未配置'}</span>
+            </h2>
+            {result && imageEnabled && !imageLoading && (
+              <button onClick={() => generateImage()} className="btn-secondary text-sm">
+                🔄 重新生成图片
+              </button>
+            )}
+          </div>
+
+          {imageLoading && (
+            <div style={{ padding: 24, textAlign: 'center', color: '#888' }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
+              <p>正在调用图片生成 API...</p>
+            </div>
+          )}
+
+          {imageError && (
+            <div style={{ padding: '12px 16px', borderRadius: 8, background: '#ff6b6b22', color: '#ff6b6b', fontSize: 14 }}>
+              ❌ {imageError}
+            </div>
+          )}
+
+          {imageResult && (
+            <div>
+              {imageResult.imageUrl && imageResult.imageUrl.startsWith('http') && (
+                <div style={{ marginBottom: 12 }}>
+                  <img
+                    src={imageResult.imageUrl}
+                    alt="生成的产品图片"
+                    style={{ maxWidth: '100%', borderRadius: 12, border: '1px solid #333' }}
+                  />
+                </div>
+              )}
+              {imageResult.imageUrl && imageResult.imageUrl.startsWith('data:') && (
+                <div style={{ marginBottom: 12 }}>
+                  <img
+                    src={imageResult.imageUrl}
+                    alt="生成的产品图片"
+                    style={{ maxWidth: '100%', borderRadius: 12, border: '1px solid #333' }}
+                  />
+                </div>
+              )}
+              {imageResult.imageUrl && !imageResult.imageUrl.startsWith('http') && !imageResult.imageUrl.startsWith('data:') && (
+                <div style={{ padding: '12px 16px', borderRadius: 8, background: '#00b89422', color: '#00b894', fontSize: 14, marginBottom: 12 }}>
+                  ℹ️ {imageResult.imageUrl}
+                </div>
+              )}
+              <div style={{ padding: '12px 16px', borderRadius: 8, background: 'rgba(30,41,59,0.5)', border: '1px solid var(--slate-700)' }}>
+                <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>图片提示词（Prompt）：</div>
+                <pre style={{ whiteSpace: 'pre-wrap', color: '#e2e8f0', fontSize: 13, lineHeight: 1.6, fontFamily: 'inherit', margin: 0 }}>
+                  {imageResult.prompt}
+                </pre>
+                <button
+                  onClick={() => copyToClipboard('imagePrompt', imageResult.prompt)}
+                  style={{ marginTop: 8, padding: '4px 12px', borderRadius: 6, border: '1px solid #444', background: '#222', color: '#aaa', cursor: 'pointer', fontSize: 12 }}
+                >
+                  {copied === 'imagePrompt' ? '✅ 已复制' : '📋 复制提示词'}
+                </button>
+              </div>
+              <div style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
+                模型: {imageResult.model}
+              </div>
+            </div>
+          )}
+
+          {!imageLoading && !imageResult && !imageError && imageEnabled && (
+            <div style={{ padding: 24, textAlign: 'center', color: '#666' }}>
+              生成文案后将自动调用图片 API 生成配图
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========== 视频生成结果区 ========== */}
+      {(videoEnabled || videoResult || videoLoading || videoError) && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              🎬 视频生成 <span className="badge badge-purple">{videoConfig ? videoConfig.provider : '未配置'}</span>
+            </h2>
+            {result && videoEnabled && !videoLoading && (
+              <button onClick={() => generateVideo()} className="btn-secondary text-sm">
+                🔄 重新生成视频
+              </button>
+            )}
+          </div>
+
+          {videoLoading && (
+            <div style={{ padding: 24, textAlign: 'center', color: '#888' }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
+              <p>正在调用视频生成 API...</p>
+            </div>
+          )}
+
+          {videoError && (
+            <div style={{ padding: '12px 16px', borderRadius: 8, background: '#ff6b6b22', color: '#ff6b6b', fontSize: 14 }}>
+              ❌ {videoError}
+            </div>
+          )}
+
+          {videoResult && (
+            <div>
+              {videoResult.videoUrl && videoResult.videoUrl.startsWith('http') && (
+                <div style={{ marginBottom: 12 }}>
+                  <video
+                    src={videoResult.videoUrl}
+                    controls
+                    style={{ maxWidth: '100%', borderRadius: 12, border: '1px solid #333' }}
+                  />
+                </div>
+              )}
+              {videoResult.videoUrl && !videoResult.videoUrl.startsWith('http') && (
+                <div style={{ padding: '12px 16px', borderRadius: 8, background: '#00b89422', color: '#00b894', fontSize: 14, marginBottom: 12 }}>
+                  ℹ️ {videoResult.videoUrl}
+                </div>
+              )}
+              <div style={{ padding: '12px 16px', borderRadius: 8, background: 'rgba(30,41,59,0.5)', border: '1px solid var(--slate-700)' }}>
+                <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>视频脚本：</div>
+                <pre style={{ whiteSpace: 'pre-wrap', color: '#e2e8f0', fontSize: 13, lineHeight: 1.6, fontFamily: 'inherit', margin: 0 }}>
+                  {videoResult.script}
+                </pre>
+                <button
+                  onClick={() => copyToClipboard('videoScript', videoResult.script)}
+                  style={{ marginTop: 8, padding: '4px 12px', borderRadius: 6, border: '1px solid #444', background: '#222', color: '#aaa', cursor: 'pointer', fontSize: 12 }}
+                >
+                  {copied === 'videoScript' ? '✅ 已复制' : '📋 复制脚本'}
+                </button>
+              </div>
+              <div style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
+                模型: {videoResult.model}
+              </div>
+            </div>
+          )}
+
+          {!videoLoading && !videoResult && !videoError && videoEnabled && (
+            <div style={{ padding: 24, textAlign: 'center', color: '#666' }}>
+              生成文案后将自动调用视频 API 生成短视频
+            </div>
+          )}
         </div>
       )}
 
