@@ -138,6 +138,7 @@ export async function POST(req: NextRequest) {
 [
   {
     "name": "品牌名",
+    "profileUrl": "该品牌官方主页或社交媒体主页链接（如 https://www.xiaohongshu.com/user/profile/xxx 或 https://www.douyin.com/user/xxx）",
     "price": { "min": 最低价数字, "max": 最高价数字 },
     "channels": ["小红书", "抖音", "微信"],
     "marketingData": {
@@ -152,19 +153,22 @@ export async function POST(req: NextRequest) {
         "type": "text",
         "platform": "小红书",
         "content": "完整的小红书种草文案（包含标题、正文、标签）",
-        "performance": "预估效果（如：点赞800-1200，收藏600+）"
+        "performance": "预估效果（如：点赞800-1200，收藏600+）",
+        "sourceUrl": "该品牌在小红书的相关笔记搜索链接，格式如 https://www.xiaohongshu.com/search_result?keyword=品牌名+产品关键词"
       },
       {
         "type": "video_script",
         "platform": "抖音",
         "content": "完整的抖音视频脚本（包含开头hook、内容、结尾引导）",
-        "performance": "预估播放量和互动数据"
+        "performance": "预估播放量和互动数据",
+        "sourceUrl": "该品牌在抖音的相关视频搜索链接，格式如 https://www.douyin.com/search/品牌名+产品关键词"
       },
       {
         "type": "image_desc",
         "platform": "小红书",
         "content": "产品图片拍摄描述（场景、构图、色调、道具）",
-        "performance": "预估点击率和收藏率"
+        "performance": "预估点击率和收藏率",
+        "sourceUrl": "该品牌在小红书的相关图片搜索链接"
       }
     ],
     "strengths": ["强项1", "强项2", "强项3"],

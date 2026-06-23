@@ -228,6 +228,23 @@ export default function CompetitorsPage() {
                     <h3 style={{ fontSize: 17, fontWeight: 700, color: '#f1f5f9' }}>
                       {comp.name}
                     </h3>
+                    {comp.profileUrl && (
+                      <a 
+                        href={comp.profileUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ 
+                          fontSize: '11px', 
+                          color: '#60a5fa',
+                          textDecoration: 'none',
+                          padding: '2px 6px',
+                          background: 'rgba(96, 165, 250, 0.1)',
+                          borderRadius: '4px',
+                        }}
+                      >
+                        🔗 主页
+                      </a>
+                    )}
                     <span className="badge badge-purple">{comp.category}</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -427,6 +444,23 @@ export default function CompetitorsPage() {
                                   <span className="badge badge-green" style={{ fontSize: 11 }}>
                                     {getMaterialTypeLabel(m.type)}
                                   </span>
+                                  {m.sourceUrl && (
+                                    <a 
+                                      href={m.sourceUrl} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      style={{ 
+                                        fontSize: '11px', 
+                                        color: '#60a5fa',
+                                        textDecoration: 'none',
+                                        padding: '2px 6px',
+                                        background: 'rgba(96, 165, 250, 0.1)',
+                                        borderRadius: '4px',
+                                      }}
+                                    >
+                                      🔗 查看原文
+                                    </a>
+                                  )}
                                   <button
                                     className="btn-secondary"
                                     style={{ padding: '2px 8px', fontSize: 11 }}

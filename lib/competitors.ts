@@ -7,6 +7,7 @@ export interface CompetitorAdMaterial {
   platform: string;
   content: string;
   performance: string;
+  sourceUrl?: string;  // 竞品投放素材原始链接
   createdAt: string;
 }
 
@@ -17,6 +18,7 @@ export interface CompetitorProfile {
   relatedProductId: string;
   price: { min: number; max: number };
   channels: string[];
+  profileUrl?: string;  // 竞品品牌主页/官方账号链接
   marketingData: {
     estimatedBudget: string;
     contentFrequency: string;
