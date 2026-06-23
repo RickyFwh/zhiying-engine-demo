@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { getClientConfig } from '@/lib/client-config';
 import { getImageConfig, getVideoConfig, type MediaConfig } from '@/lib/media-config';
 import { saveContent, type StoredContentItem } from '@/lib/storage';
+import { saveMedia } from '@/lib/media-storage';
 
 // Toast type definition
 type ToastType = 'success' | 'error' | 'info';
@@ -239,17 +240,23 @@ export default function ContentPage() {
     finally { setLoading(false); }
   };
 
+  // 图片生成进度
+  const [imageElapsed, setImageElapsed] = useState(0);
+
   // 单独触发图片生成
   const generateImage = async (content?: string) => {
     const freshConfig = getImageConfig();
     setImageConfig(freshConfig);
-    if (!freshConfig || !freshConfig.apiKey) {
-      setImageError('请先在设置页配置图片生成 API');
-      return;
-    }
     setImageLoading(true);
     setImageError('');
     setImageResult(null);
+    setImageElapsed(0);
+
+    // 计时器：每3秒更新进度
+    const timer = setInterval(() => {
+      setImageElapsed(prev => prev + 3);
+    }, 3000);
+
     try {
       const textContent = content || result;
       const imgPrompt = generateImagePrompt(textContent);
@@ -261,16 +268,34 @@ export default function ContentPage() {
           productInfo: { name: productNames[productId] },
           platform,
           mediaConfig: freshConfig,
+          clientConfig: getClientConfig(), // 传递 LLM 配置作为后备
         }),
       });
       const data = await res.json();
+      clearInterval(timer);
       if (data.success) {
         setImageResult({ imageUrl: data.imageUrl, prompt: data.prompt, model: data.model });
+        addToast('success', '🎨 图片生成完成！');
+        // 保存到媒体中心
+        saveMedia({
+          id: `img-${Date.now()}`,
+          type: 'image',
+          url: data.imageUrl,
+          prompt: data.prompt,
+          product: productNames[productId],
+          platform: platform,
+          model: data.model,
+          provider: freshConfig?.provider || 'dashscope',
+          createdAt: new Date().toISOString(),
+        });
       } else {
         setImageError(data.error || '图片生成失败');
+        addToast('error', '❌ 图片生成失败: ' + (data.error || ''));
       }
     } catch (err: any) {
+      clearInterval(timer);
       setImageError('图片生成错误: ' + err.message);
+      addToast('error', '❌ 图片生成错误: ' + err.message);
     }
     setImageLoading(false);
   };
@@ -279,10 +304,6 @@ export default function ContentPage() {
   const generateVideo = async (content?: string) => {
     const freshConfig = getVideoConfig();
     setVideoConfig(freshConfig);
-    if (!freshConfig || !freshConfig.apiKey) {
-      setVideoError('请先在设置页配置视频生成 API');
-      return;
-    }
     setVideoLoading(true);
     setVideoError('');
     setVideoResult(null);
@@ -297,16 +318,32 @@ export default function ContentPage() {
           productInfo: { name: productNames[productId] },
           platform,
           mediaConfig: freshConfig,
+          clientConfig: getClientConfig(),
         }),
       });
       const data = await res.json();
       if (data.success) {
         setVideoResult({ videoUrl: data.videoUrl, script: data.script, model: data.model });
+        addToast('success', '🎬 视频生成完成！');
+        // 保存到媒体中心
+        saveMedia({
+          id: `vid-${Date.now()}`,
+          type: 'video',
+          url: data.videoUrl,
+          prompt: data.script,
+          product: productNames[productId],
+          platform: platform,
+          model: data.model,
+          provider: freshConfig?.provider || 'unknown',
+          createdAt: new Date().toISOString(),
+        });
       } else {
         setVideoError(data.error || '视频生成失败');
+        addToast('error', '❌ 视频生成失败: ' + (data.error || ''));
       }
     } catch (err: any) {
       setVideoError('视频生成错误: ' + err.message);
+      addToast('error', '❌ 视频生成错误: ' + err.message);
     }
     setVideoLoading(false);
   };
@@ -474,14 +511,23 @@ export default function ContentPage() {
               icon="🎬"
             />
           </div>
-          {/* 警告提示 */}
+          {/* 状态提示 */}
           {imageEnabled && !imageConfig && (
             <div style={{
               marginTop: 8, padding: '8px 14px', borderRadius: 8,
-              background: '#f39c1222', color: '#f39c12', fontSize: 13,
-              border: '1px solid #f39c1244',
+              background: '#00b89422', color: '#00b894', fontSize: 13,
+              border: '1px solid #00b89444',
             }}>
-              ⚠️ 图片生成已开启，但尚未配置 API。请在「设置」页面配置图片生成 API。
+              ✅ 图片生成已开启，将使用 LLM 设置的 DashScope API Key 调用通义万相生成图片
+            </div>
+          )}
+          {imageEnabled && imageConfig && (
+            <div style={{
+              marginTop: 8, padding: '8px 14px', borderRadius: 8,
+              background: '#6c5ce722', color: '#a29bfe', fontSize: 13,
+              border: '1px solid #6c5ce744',
+            }}>
+              🎨 图片生成已开启，使用专用 API: {imageConfig.provider} ({imageConfig.model})
             </div>
           )}
           {videoEnabled && !videoConfig && (
@@ -641,7 +687,7 @@ export default function ContentPage() {
         <div id="image-section" ref={imageSectionRef} className={`card p-6 ${imageLoading ? 'media-pulse' : ''}`}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              🎨 图片生成 <span className="badge badge-blue">{imageConfig ? imageConfig.provider : '未配置'}</span>
+              🎨 图片生成 <span className="badge badge-blue">{imageConfig ? imageConfig.provider : '通义万相 (DashScope)'}</span>
             </h2>
             {result && imageEnabled && !imageLoading && (
               <button onClick={() => generateImage()} className="btn-secondary text-sm">
@@ -651,15 +697,56 @@ export default function ContentPage() {
           </div>
 
           {imageLoading && (
-            <div style={{ padding: 24, textAlign: 'center', color: '#888' }}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
-              <p>正在调用图片生成 API...</p>
+            <div className="media-pulse" style={{ padding: 24, textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 16 }}>
+                <div style={{
+                  width: 32, height: 32, border: '3px solid #333', borderTopColor: '#6c5ce7',
+                  borderRadius: '50%', animation: 'spin 1s linear infinite'
+                }} />
+                <span style={{ color: '#a29bfe', fontSize: 16, fontWeight: 600 }}>
+                  通义万相正在生成图片...
+                </span>
+              </div>
+              <div style={{ color: '#888', fontSize: 14, marginBottom: 12 }}>
+                已耗时 <span style={{ color: '#f39c12', fontWeight: 600 }}>{imageElapsed}s</span>
+                {' '}· 通常需要 15-60 秒
+              </div>
+              <div style={{
+                width: '100%', height: 4, background: '#1e293b', borderRadius: 2, overflow: 'hidden'
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${Math.min(imageElapsed / 60 * 100, 95)}%`,
+                  background: 'linear-gradient(90deg, #6c5ce7, #a29bfe)',
+                  borderRadius: 2,
+                  transition: 'width 0.5s ease',
+                }} />
+              </div>
+              <div style={{ color: '#666', fontSize: 12, marginTop: 8 }}>
+                {imageElapsed < 5 ? '📤 提交生成任务...' :
+                 imageElapsed < 15 ? '🎨 AI 正在绘制图片...' :
+                 imageElapsed < 30 ? '✨ 精细化渲染中...' :
+                 imageElapsed < 60 ? '⏳ 即将完成，请耐心等待...' :
+                 '⚠️ 生成时间较长，请稍候...'}
+              </div>
             </div>
           )}
 
           {imageError && (
-            <div style={{ padding: '12px 16px', borderRadius: 8, background: '#ff6b6b22', color: '#ff6b6b', fontSize: 14 }}>
-              ❌ {imageError}
+            <div style={{ padding: '16px', borderRadius: 8, background: '#ff6b6b15', border: '1px solid #ff6b6b44' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 20 }}>❌</span>
+                <span style={{ color: '#ff6b6b', fontSize: 14, fontWeight: 600 }}>图片生成失败</span>
+              </div>
+              <div style={{ color: '#ff8888', fontSize: 13, marginLeft: 28 }}>{imageError}</div>
+              <div style={{ marginLeft: 28, marginTop: 12 }}>
+                <button onClick={() => generateImage()} className="btn-secondary text-xs" style={{ marginRight: 8 }}>
+                  🔄 重试
+                </button>
+                <span style={{ color: '#666', fontSize: 12 }}>
+                  提示：如使用 DashScope，请确保 API Key 已开通通义万相权限
+                </span>
+              </div>
             </div>
           )}
 
@@ -708,7 +795,11 @@ export default function ContentPage() {
 
           {!imageLoading && !imageResult && !imageError && imageEnabled && (
             <div style={{ padding: 24, textAlign: 'center', color: '#666' }}>
-              生成文案后将自动调用图片 API 生成配图
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🎨</div>
+              <div>生成文案后将自动调用通义万相生成配图</div>
+              <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>
+                使用 LLM 设置的 API Key（DashScope），无需单独配置图片 API
+              </div>
             </div>
           )}
         </div>
